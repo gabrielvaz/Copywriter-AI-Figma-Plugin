@@ -1,6 +1,6 @@
 figma.showUI(__html__, {
   width: 400,
-  height: 600
+  height: 600,
 });
 
 function getTextNodesFromSelection() {
@@ -18,11 +18,9 @@ function getTextNodesFromSelection() {
     return [];
   }
 
-  const textNodes = frame.findAll(node => node.type === 'TEXT') as TextNode[];
+  const textNodes = frame.findAll((node) => node.type === 'TEXT') as TextNode[];
   console.log('Found text nodes:', textNodes);
-  const filteredNodes = textNodes
-    .map(node => node.characters.trim())
-    .filter(text => text.split(' ').length > 3);
+  const filteredNodes = textNodes.map((node) => node.characters.trim()).filter((text) => text.split(' ').length > 3);
   console.log('Filtered text nodes:', filteredNodes);
   return filteredNodes;
 }
@@ -32,7 +30,7 @@ function updateTextNodes() {
   console.log('Sending text nodes to UI:', textNodes);
   figma.ui.postMessage({
     type: 'update-text-nodes',
-    textNodes: textNodes
+    textNodes: textNodes,
   });
 }
 
@@ -44,17 +42,22 @@ figma.on('selectionchange', () => {
 async function callGeminiAPI(apiKey: string, prompt: string, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }]
-        })
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: prompt }],
+              },
+            ],
+          }),
+        }
+      );
 
       const data = await response.json();
       console.log('Raw Gemini Response:', JSON.stringify(data));
@@ -87,7 +90,7 @@ async function callGeminiAPI(apiKey: string, prompt: string, retries = 3) {
     } catch (error) {
       console.error(`Attempt ${i + 1} failed:`, error);
       if (i === retries - 1) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retrying
     }
   }
   throw new Error('Max retries reached for Gemini API call');
@@ -96,7 +99,7 @@ async function callGeminiAPI(apiKey: string, prompt: string, retries = 3) {
 async function createCopiesOfSelectedFrame(numVariations: number, generatedCopies: any, selectedNodeIndices: number[]) {
   const selection = figma.currentPage.selection;
   if (selection.length === 0 || selection[0].type !== 'FRAME') {
-    figma.notify('Please select a frame to duplicate');
+    figma.notify('Selecione um frame para duplicar');
     return;
   }
 
@@ -110,7 +113,7 @@ async function createCopiesOfSelectedFrame(numVariations: number, generatedCopie
     figma.currentPage.appendChild(copy);
 
     // Apply generated copy to selected text nodes
-    const textNodes = copy.findAll(node => node.type === 'TEXT') as TextNode[];
+    const textNodes = copy.findAll((node) => node.type === 'TEXT') as TextNode[];
     let generatedTexts: string[] = [];
 
     if (generatedCopies && typeof generatedCopies === 'object') {
@@ -128,7 +131,9 @@ async function createCopiesOfSelectedFrame(numVariations: number, generatedCopie
           textNodes[nodeIndex].characters = generatedTexts[j];
         } catch (fontError) {
           console.error(`Failed to load font for node ${nodeIndex}:`, fontError);
-          figma.notify(`Skipped updating text node ${nodeIndex} due to font loading issues`, { timeout: 3000 });
+          figma.notify(`Não foi possível atualizar o texto ${nodeIndex} devido a problemas de carregamento de fonte`, {
+            timeout: 3000,
+          });
         }
       }
     }
@@ -137,8 +142,10 @@ async function createCopiesOfSelectedFrame(numVariations: number, generatedCopie
   }
 
   // Apply changes to the original frame as well
-  const originalTextNodes = originalFrame.findAll(node => node.type === 'TEXT') as TextNode[];
-  const originalGeneratedTexts = generatedCopies['variant_1'] ? Object.values(generatedCopies['variant_1'] as object).map(String) : [];
+  const originalTextNodes = originalFrame.findAll((node) => node.type === 'TEXT') as TextNode[];
+  const originalGeneratedTexts = generatedCopies['variant_1']
+    ? Object.values(generatedCopies['variant_1'] as object).map(String)
+    : [];
 
   for (let j = 0; j < selectedNodeIndices.length; j++) {
     const nodeIndex = selectedNodeIndices[j];
@@ -148,7 +155,10 @@ async function createCopiesOfSelectedFrame(numVariations: number, generatedCopie
         originalTextNodes[nodeIndex].characters = originalGeneratedTexts[j];
       } catch (fontError) {
         console.error(`Failed to load font for original node ${nodeIndex}:`, fontError);
-        figma.notify(`Skipped updating original text node ${nodeIndex} due to font loading issues`, { timeout: 3000 });
+        figma.notify(
+          `Não foi possível atualizar o texto original ${nodeIndex} devido a problemas de carregamento de fonte`,
+          { timeout: 3000 }
+        );
       }
     }
   }
@@ -158,14 +168,17 @@ async function createCopiesOfSelectedFrame(numVariations: number, generatedCopie
 }
 
 figma.ui.onmessage = async (msg) => {
-  console.log('Received message from UI:', { ...msg, apiKey: msg.apiKey ? msg.apiKey.substring(0, 5) + '...' : undefined });
+  console.log('Received message from UI:', {
+    ...msg,
+    apiKey: msg.apiKey ? msg.apiKey.substring(0, 5) + '...' : undefined,
+  });
   if (msg.type === 'generate-copy') {
     const { apiKey, combinedText, toneOfVoice, numVariations, specialInstructions, selectedNodeIndices } = msg;
     if (!apiKey) {
       console.error('API Key is missing');
       figma.ui.postMessage({
         type: 'generate-copy-error',
-        message: 'API Key is missing'
+        message: 'A chave da API está faltando',
       });
       return;
     }
@@ -173,28 +186,30 @@ figma.ui.onmessage = async (msg) => {
     try {
       console.log('Sending request to Gemini...');
       const prompt = `Generate ${numVariations} unique variants of the following input text: ${combinedText}\n\nConsider the following instructions:\nTone: ${toneOfVoice}.\nSpecial instructions: ${specialInstructions}\n\nPlease output the variants in JSON format.\n\nEach sentence in the variant should maintain a word count close to the corresponding sentence in the input text. For example, if the first sentence of the input text has 6 words, the first sentence of each variant should also have around 6 words. Similarly, if the second sentence has 20 words, the second sentence of each variant should also have around 20 words.\n\nEnsure the number of sentences in each variant matches the number of sentences in the input text.\n\nFor example, if the input has 2 sentences and we need 2 variations, the output should be:\n{\n "variant_1": { "text_1": "First variant of the first sentence", "text_2": "First variant of the second sentence" },\n "variant_2": { "text_1": "Second variant of the first sentence", "text_2": "Second variant of the second sentence" }\n}`;
-      
+
       console.log('Final prompt:', prompt);
-      
+
       const parsedResponse = await callGeminiAPI(apiKey, prompt);
       console.log('Parsed response:', parsedResponse);
-      
+
       // Format the response for display and application to designs
       let formattedResponse: string[] = [];
       if (typeof parsedResponse === 'object' && !Array.isArray(parsedResponse)) {
-        formattedResponse = Object.entries(parsedResponse).map(([key, value]) => {
-          if (typeof value === 'object' && value !== null) {
-            return `${key.toUpperCase()}:\n${Object.values(value).join('\n')}`;
-          }
-          return '';
-        }).filter(Boolean);
+        formattedResponse = Object.entries(parsedResponse)
+          .map(([key, value]) => {
+            if (typeof value === 'object' && value !== null) {
+              return `${key.toUpperCase()}:\n${Object.values(value).join('\n')}`;
+            }
+            return '';
+          })
+          .filter(Boolean);
       } else {
         throw new Error('Unexpected response format from API: ' + JSON.stringify(parsedResponse));
       }
 
       figma.ui.postMessage({
         type: 'generate-copy-response',
-        message: formattedResponse.join('\n\n')
+        message: formattedResponse.join('\n\n'),
       });
 
       console.log('Selected node indices:', selectedNodeIndices);
@@ -203,10 +218,10 @@ figma.ui.onmessage = async (msg) => {
       // After successfully generating the copy, create copies of the selected frame and apply the generated text
       await createCopiesOfSelectedFrame(numVariations, parsedResponse, selectedNodeIndices);
 
-      figma.notify('Generated copies have been applied to the designs');
+      figma.notify('As cópias geradas foram aplicadas aos designs');
     } catch (error) {
       console.error('Error in generate-copy process:', error);
-      let errorMessage = 'An error occurred while generating copy. ';
+      let errorMessage = 'Ocorreu um erro ao gerar a cópia. ';
       if (error instanceof Error) {
         errorMessage += error.message;
         console.error('Error stack:', error.stack);
@@ -215,9 +230,9 @@ figma.ui.onmessage = async (msg) => {
       }
       figma.ui.postMessage({
         type: 'generate-copy-error',
-        message: errorMessage
+        message: errorMessage,
       });
-      figma.notify('Error: ' + errorMessage, { timeout: 5000 });
+      figma.notify('Erro: ' + errorMessage, { timeout: 5000 });
     }
   } else if (msg.type === 'cancel') {
     figma.closePlugin();
